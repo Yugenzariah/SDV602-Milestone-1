@@ -14,7 +14,7 @@ class Monster:
 
     def attack_player(self) -> int:
         """Return random damage dealt by the monster to the player."""
-        return random.randint(3, 10)
+        return random.randint(5, 20)
 
 class MonsterFight:
     """System to manage monster fights and track monsters in the game."""
