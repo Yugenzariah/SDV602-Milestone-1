@@ -67,6 +67,12 @@ class CommandParser:
                 if "defeated" in fight_result:
                     self.status.update_score(10)
                     self.set_current_monster(None)
+                    
+                    # Now we make sure to always get the monsters in the location
+                    monsters_in_location = self.game_places[self.get_game_state()]['Monsters']
+                    
+                    if current_monster in monsters_in_location:
+                        monsters_in_location.remove(current_monster)
 
                 return fight_result, False
             else:
