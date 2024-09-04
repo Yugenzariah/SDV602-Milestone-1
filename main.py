@@ -4,6 +4,7 @@ from io import BytesIO
 from command_parser.command_parser import CommandParser
 from monster_fight.monster_fight import MonsterFight
 from status.status import Status  # Import the Status class
+from inventory.inventory import Inventory  # Import the Inventory class
 import random
 
 # Define the initial game state and places
@@ -91,6 +92,9 @@ def main():
     # Initialize the Status class to track score and inventory
     status = Status()
 
+    # Initialize the Inventory class to track picked-up items
+    inventory = Inventory()
+
     # Create an instance of CommandParser, passing game_play, monster_fight, game_places, and status
     parser = CommandParser(
         game_play, 
@@ -99,7 +103,8 @@ def main():
         lambda: game_state, 
         lambda: current_monster, 
         lambda x: set_current_monster(x), 
-        status
+        status,
+        inventory  # Pass inventory to the parser
     )
 
     # Main game loop
