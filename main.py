@@ -3,75 +3,76 @@ from PIL import Image
 from io import BytesIO
 from command_parser.command_parser import CommandParser
 from monster_fight.monster_fight import MonsterFight
-from status.status import Status  # Import the Status class
-from inventory.inventory import Inventory  # Import the Inventory class
+from status.status import Status
+from inventory.inventory import Inventory
 import random
 
-# Define the initial game state and places
-game_state = 'Hunted Forest'
-current_monster = None  # Track the currently encountered monster
-game_places = {
+# Game state and available places with monsters, stories, and paths
+game_state: str = 'Hunted Forest'
+current_monster: str = None  # Track the currently encountered monster
+game_places: dict = {
     'Hunted Forest': {
         'Story': 'You are in a hunted forest.\nTo the north is a desert wasteland.\nTo the south is an abandoned castle.',
         'North': 'Desert Wasteland',
         'South': 'Abandoned Castle',
         'Image': 'hunted_forest.png',
-        'Monsters': ['Zombie']  # Monsters that can appear here
+        'Monsters': ['Zombie', 'Goblin']  # Monsters in this location
     },
     'Desert Wasteland': {
         'Story': 'You are now at the desert wasteland.\nTo the south is the hunted forest.',
         'North': '',
         'South': 'Hunted Forest',
         'Image': 'desert_wasteland.png',
-        'Monsters': []  # No monsters in this area
+        'Monsters': ['Troll']  # Monsters in this location
     },
     'Abandoned Castle': {
         'Story': 'You are now at the abandoned castle.\nTo the north is the Hunted Forest.',
         'North': 'Hunted Forest',
         'South': '',
         'Image': 'abandoned_castle.png',
-        'Monsters': ['Mutant']  # Monsters that can appear here
+        'Monsters': ['Mutant', 'Vampire']  # Monsters in this location
     },
 }
 
-def resize_image(image_path, max_size):
-    """Resize the image to fit within the max_size while keeping the aspect ratio."""
+def resize_image(image_path: str, max_size: tuple) -> bytes:
+    """Resize the image to fit within the given max_size while maintaining the aspect ratio."""
     img = Image.open(image_path)
-    img.thumbnail(max_size)  # Resizes the image, keeping the aspect ratio
+    img.thumbnail(max_size)
     bio = BytesIO()
     img.save(bio, format="PNG")
     return bio.getvalue()
 
-def show_current_place():
-    """Gets the story at the game_state place."""
+def show_current_place() -> str:
+    """Return the story of the current game state."""
     global game_state
     return game_places[game_state]['Story']
 
-def make_a_window():
-    """Creates the game window."""
+def make_a_window() -> sg.Window:
+    """Create the game window with a layout containing the image, story, and input area."""
     
     sg.theme('Dark Blue 3')  # Set the window theme
-    
-    # Define the layout with the input area in a separate section
+
+    # Define layout components
     prompt_input = [sg.Text('Enter your command', font='Any 14'), sg.Input(key='-IN-', size=(20,1), font='Any 14', focus=True)]
     buttons = [sg.Button('Enter', bind_return_key=True), sg.Button('Exit')]
     command_col = sg.Column([prompt_input, buttons], element_justification='r')
 
-    # Image and output text area
+    # Combine layout components into a window
     layout = [
-        [sg.Image(resize_image(game_places['Hunted Forest']['Image'], (300, 300)), key='-IMG-')],  # Resized image
-        [sg.Text(show_current_place(), size=(50,4), font='Any 12', key='-OUTPUT-')],  # Story output text
-        [command_col]  # The input area and buttons stay here permanently at the bottom
+        [sg.Image(resize_image(game_places['Hunted Forest']['Image'], (300, 300)), key='-IMG-')],
+        [sg.Text(show_current_place(), size=(50, 4), font='Any 12', key='-OUTPUT-')],
+        [command_col]
     ]
 
-    return sg.Window('Adventure Game', layout, size=(500,400), finalize=True)
+    return sg.Window('Adventure Game', layout, size=(500, 400), finalize=True)
 
-def game_play(direction):
-    """Handles the game play by updating the game state based on direction."""
+def game_play(direction: str) -> str:
+    """Update the game state based on the player's direction and return the story of the new place."""
     global game_state
-    global current_monster  # Reset the monster encounter when moving
+    global current_monster
     current_monster = None  # Reset current monster on movement
-    if direction in ['North', 'South']:  # Check if the direction is valid
+
+    if direction in ['North', 'South']:
         game_place = game_places[game_state]
         proposed_state = game_place[direction]
         if proposed_state == '':
@@ -81,21 +82,22 @@ def game_play(direction):
             return game_places[game_state]['Story']
 
 def main():
+    """Main game loop handling window events, player commands, and game state updates."""
     # Create the game window
     window = make_a_window()
 
-    # Initialize the MonsterFight system
+    # Initialize systems for monster fighting, status, and inventory
     monster_fight = MonsterFight()
     monster_fight.add_monster("Zombie", 30, 5)
     monster_fight.add_monster("Mutant", 50, 8)
+    monster_fight.add_monster("Goblin", 20, 3)
+    monster_fight.add_monster("Troll", 60, 10)
+    monster_fight.add_monster("Vampire", 40, 7)
 
-    # Initialize the Status class to track score and inventory
     status = Status()
-
-    # Initialize the Inventory class to track picked-up items
     inventory = Inventory()
 
-    # Create an instance of CommandParser, passing game_play, monster_fight, game_places, and status
+    # Command parser to handle player input
     parser = CommandParser(
         game_play, 
         monster_fight, 
@@ -104,35 +106,40 @@ def main():
         lambda: current_monster, 
         lambda x: set_current_monster(x), 
         status,
-        inventory  # Pass inventory to the parser
+        inventory
     )
 
-    # Main game loop
+    # Game event loop
     while True:
         event, values = window.read()
 
         if event == 'Enter':
             command = values['-IN-']
-            result = parser.parse(command)  # Use the parser to process the input command
+            result, game_over = parser.parse(command)  # Process the input command
             
             # Update the story text
-            window['-OUTPUT-'].update(result)  # Show the command result (fight result, move result, etc.)
+            window['-OUTPUT-'].update(result)
+
+            # If the player dies, close the game
+            if game_over:
+                sg.popup("You have died. Game Over.", title="Game Over")
+                break
 
             # Update and resize the image for the new location if the game_state has changed
             resized_image = resize_image(game_places[game_state]['Image'], (300, 300))
             window['-IMG-'].update(data=resized_image)
 
-            # Clear the input field and focus it again for the next command
+            # Clear the input field for the next command
             window['-IN-'].update('')
-            window['-IN-'].set_focus()  # Ensure the input field is focused after every action
+            window['-IN-'].set_focus()
         
         elif event == 'Exit' or event == sg.WIN_CLOSED:
             break
 
     window.close()
 
-# Function to update the current monster encountered
-def set_current_monster(monster):
+def set_current_monster(monster: str):
+    """Update the current monster encountered."""
     global current_monster
     current_monster = monster
 
